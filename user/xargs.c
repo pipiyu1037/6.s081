@@ -23,9 +23,15 @@ int parseLine(char* suffix, char* args[])
         }
 
         while(strchr(whitespace, *suffix) == 0){
-            *p++ = *suffix++;
+            *p = *suffix;
+            if(*suffix == '\0'){
+                break;
+            }
+            ++p;
+            ++suffix;
         }
     }
+
 
     return i;
 }
@@ -34,51 +40,48 @@ int
 main(int argc, char* argv[])
 {
     char* com = argv[1];
-
-    printf("command: %s argc: %d\n", com, argc);
     char* fixedArg[MAXARG];
-
-    char suffixArg[64], *p;
+    char suffixArg[32], *p;
 
     for(int i = 1; i < argc; ++i){
         fixedArg[i-1] = argv[i];
-        printf("fix: %s \n", fixedArg[i-1]);
     }
 
     p = suffixArg;
 
-    while(read(0, (void *)p, 1)){
+    while(read(0, (void *)p, 1) == 1){
         if(*p == '\0'){
+            int num = parseLine(suffixArg, fixedArg + argc -1);
+            fixedArg[argc + num -1] = 0;
+
+            if(fork() == 0){
+                exec(com, fixedArg);
+                exit(0);
+            }else{
+                wait(0);
+            }
+
+            p = suffixArg;
             break;
         }
 
         if(*p == '\n'){
             *p = '\0';
+            
+            int num = parseLine(suffixArg, fixedArg + argc -1);
+            fixedArg[argc + num -1] = 0;
+
+            if(fork() == 0){
+                exec(com, fixedArg);
+                exit(0);
+            }else{
+                wait(0);
+            }
 
             p = suffixArg;
             continue;
         }
         ++p;
     }
-
-    printf("suffix: %s \n", suffixArg);
-    
-    // for(int num = parseLine(&suffixArg, fixedArg + argc -1); num != 0; ){
-    //     fixedArg[argc + num -1] = 0;
-
-    //     printf("num: %d\n", num);
-
-    //     if(fork() == 0){
-    //         for(int i = 0; i < argc + num - 1; i++){
-    //             printf("%s\n", fixedArg[i]);
-    //         }
-    //         exec(com, fixedArg);
-    //     }else{
-    //         wait(0);
-    //         exit(0);
-    //     }
-        
-    // }
-
     exit(0);
 }
