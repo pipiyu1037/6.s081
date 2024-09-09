@@ -484,3 +484,22 @@ sys_pipe(void)
   }
   return 0;
 }
+
+uint64
+sys_sysinfo(void)
+{
+  uint64 pSysInfo;
+  if(argaddr(0, &pSysInfo) < 0)
+    return -1;
+  struct proc* p = myproc();
+  uint64 Nproc = getNProc();
+  uint64 freeMem = getFreeMem();
+
+  if(copyout(p->pagetable, pSysInfo, (char*)&freeMem, sizeof(freeMem)) < 0 ||
+     copyout(p->pagetable, pSysInfo + sizeof(freeMem), (char*)&Nproc, sizeof(Nproc)) < 0){
+    
+    return -1;
+  }
+  
+  return 0;
+}
