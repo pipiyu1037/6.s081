@@ -77,10 +77,61 @@ sys_sleep(void)
 
 
 #ifdef LAB_PGTBL
+
+#define MAXPG 64
+
 int
 sys_pgaccess(void)
 {
   // lab pgtbl: your code here.
+  uint64 va;
+  int pageNum;
+  uint64 pBuf;
+
+  pagetable_t topPagetable = myproc()->pagetable;
+  uint64 KBuf = 0;
+
+  if(argaddr(0, &va) < 0)
+    return -1;
+
+  if(va >= MAXVA)
+    panic("pgaccess");
+
+  if(argint(1, &pageNum) < 0)
+    return -1;
+
+  if(pageNum > MAXPG)
+    panic("pgaccess");
+
+  if(argaddr(2, &pBuf) < 0)
+    return -1;
+  
+  for(int i = 0; i < pageNum; i++){
+    pagetable_t pagetable = topPagetable;
+    int pteValid = 1;
+    for(int level = 2; level > 0; level--){
+      pte_t pte = pagetable[PX(level, va)];
+      if(pte & PTE_V){
+        pagetable = (pagetable_t)PTE2PA(pte);
+      }else{
+        pteValid = 0;
+        break;
+      }
+    }
+    if(!pteValid) break;
+
+    if(pagetable[PX(0, va) + i] & PTE_A){
+      printf("%d ", i);
+      KBuf |= (1L << i);
+    }
+    pagetable[PX(0, va) + i] &= ~PTE_A;
+  }
+  printf("\n");
+  vmprint(topPagetable, 0);
+
+  printf("%p\n", KBuf);
+  if(copyout(topPagetable, pBuf, (char*)&KBuf, sizeof(KBuf)) < 0)
+    return -1;
   return 0;
 }
 #endif
