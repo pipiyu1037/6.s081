@@ -112,11 +112,15 @@ sys_sigalarm(void)
   struct proc* p = myproc();
 
   acquire(&p->lock);
-  if(interval == 0 || handler == 0)
-    p->ticks = 0;
+
+  if(p->alarmframe == 0 && (p->alarmframe = (struct trapframe *)kalloc()) == 0){
+    release(&p->lock);
+    return -1;
+  }
 
   p->alarmInterval = interval;
   p->alarmHandler = handler;
+  
   release(&p->lock);
 
   return 0;
@@ -125,5 +129,11 @@ sys_sigalarm(void)
 uint64
 sys_sigreturn(void)
 {
+  struct proc* p = myproc();
+    
+  acquire(&p->lock);
+  *p->trapframe = *p->alarmframe;
+  p->inAlarm = 0;
+  release(&p->lock);
   return 0;
 }

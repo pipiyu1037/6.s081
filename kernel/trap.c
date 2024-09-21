@@ -78,12 +78,14 @@ usertrap(void)
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2){
-    if(p->alarmInterval != 0){
+    if(p->alarmInterval != 0 && p->inAlarm == 0){
       acquire(&p->lock);
       ++p->ticks;
       if(p->ticks == p->alarmInterval){
         p->ticks = 0;
+        *p->alarmframe = *p->trapframe;
         p->trapframe->epc = p->alarmHandler;
+        p->inAlarm = 1;
       }
       release(&p->lock);
     }
