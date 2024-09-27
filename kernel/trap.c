@@ -65,6 +65,15 @@ usertrap(void)
     intr_on();
 
     syscall();
+  } else if(r_scause() == 15 || r_scause() == 13 ){
+    uint64 va = r_stval();
+    if(checkCow(p, va)){
+      if(cowHandler(va) != 0){
+        p->killed = 1;
+      }
+    }else{
+      p->killed = 1;
+    }
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
@@ -218,3 +227,55 @@ devintr()
   }
 }
 
+
+int cowHandler(uint64 va){
+  struct proc* p = myproc();
+  pte_t* pte = walk(p->pagetable, va, 0);
+  if(pte == 0)
+    panic("cow handler");
+
+  uint64 oldPa = PTE2PA(*pte);
+
+  acquire(&RCLock);
+  if(referCount[RCINDEX(oldPa)] == 1){
+    *pte &= ~PTE_C;
+    *pte |= PTE_W;
+  }else{
+    uint64 pa = (uint64)kalloc();
+    if(pa == 0){
+      release(&RCLock);
+      return -1;
+    }
+    uint64 flags = PTE_FLAGS(*pte);
+    flags &= ~PTE_C;
+    memmove((char*)pa, (char*)oldPa, PGSIZE);
+    uvmunmap(p->pagetable, PGROUNDDOWN(va), 1, 0);
+     
+    --referCount[RCINDEX(oldPa)];
+    if(mappages(p->pagetable, PGROUNDDOWN(va), PGSIZE, pa, flags | PTE_W) != 0){
+      kfree((void*)pa);
+      return -1;
+    }
+  }
+  release(&RCLock);
+  return 0;
+}
+
+int lazyAllocHandler(uint64 va){
+  struct proc* p = myproc();
+  uint64 pa = (uint64)kalloc();
+  if(pa == 0)
+    return -1;
+  
+  memset((void*)pa, 0, PGSIZE);
+  if(mappages(p->pagetable, va, PGSIZE, pa, PTE_R | PTE_W | PTE_U) != 0){
+    kfree((void*) pa);
+    return -1;
+  }
+  return 0;
+}
+
+int checkCow(struct proc* p, uint64 va){
+  pte_t* pte ;
+  return va < p->sz && ((pte = walk(p->pagetable, va, 0))!= 0) && (*pte & PTE_C) && (*pte & PTE_V) ;
+}
