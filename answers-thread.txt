@@ -1,0 +1,2 @@
+When 2 threads call the "insert(key, value, &table[i], table[i])" at the same time with the same table[i], one of the two inserts will be lost.
+That is, tha insert operation must be atomic.
